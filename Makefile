@@ -9,4 +9,4 @@ $(bin):TestUnit.cpp
 
 .PHONY:clean
 clean:
-	rm test
+	rm -rf test core*
