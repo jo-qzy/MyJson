@@ -313,7 +313,8 @@ static int lept_parse_array(lept_context* c, lept_value* v)
         else if (*c->json == ']')
         {
             size *= v->size;
-            memcpy(v->array = (lept_value*)malloc(size), lept_context_pop(c, size), size);
+            v->array = (lept_value*)malloc(size);
+            memcpy(v->array, lept_context_pop(c, size), size);
             c->json++;
             v->type = LEPT_ARRAY;
             tmp_v.array = NULL;
