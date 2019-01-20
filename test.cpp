@@ -24,22 +24,19 @@ int test_pass = 0;
 #define EXPECT_EQ_STRING(expect, actual) EXPECT_EQ_BASE(((expect) == (actual)), expect, actual)
 #define EXPECT_EQ_SIZE_T(expect, actual) EXPECT_EQ_BASE((expect) == (actual), (size_t)expect, (size_t)actual)
 
-static void test_parse_null()
-{
+static void test_parse_null() {
     json j;
     EXPECT_EQ_INT(PARSE_OK, j.parse("null"));
     EXPECT_EQ_INT(JSON_NULL, j.get_type());
 }
 
-static void test_parse_true()
-{
+static void test_parse_true() {
     json j;
     EXPECT_EQ_INT(PARSE_OK, j.parse("true"));
     EXPECT_EQ_INT(JSON_TRUE, j.get_type());
 }
 
-static void test_parse_false()
-{
+static void test_parse_false() {
     json j;
     EXPECT_EQ_INT(PARSE_OK, j.parse("false"));
     EXPECT_EQ_INT(JSON_FALSE, j.get_type());
@@ -53,8 +50,7 @@ static void test_parse_false()
         EXPECT_EQ_DOUBLE(expect, j.get_number());\
     } while (0)
 
-static void test_parse_number()
-{
+static void test_parse_number() {
     TEST_NUMBER(0.0, "0");
     TEST_NUMBER(1.0, "1.0");
     TEST_NUMBER(1E10, "1E10");
@@ -97,8 +93,7 @@ static void test_parse_number()
         EXPECT_EQ_STRING(dst, j.get_string());\
     } while (0)
 
-static void test_parse_string()
-{
+static void test_parse_string() {
     TEST_STRING("", "\"\"");
     TEST_STRING("Hello", "\"Hello\"");
     TEST_STRING("Hello\nWorld", "\"Hello\\nWorld\"");
@@ -113,8 +108,7 @@ static void test_parse_string()
     TEST_STRING("\xF0\x9D\x84\x9E", "\"\\ud834\\udd1e\"");  /* G clef sign U+1D11E */
 }
 
-static void test_access_string()
-{
+static void test_access_string() {
     json j;
     j.set_string("");
     EXPECT_EQ_STRING("", j.get_string());
@@ -122,8 +116,7 @@ static void test_access_string()
     EXPECT_EQ_STRING("Hello", j.get_string());
 }
 
-static void test_parse_array()
-{
+static void test_parse_array() {
     json j;
     EXPECT_EQ_INT(PARSE_OK, j.parse("[   ]"));
     EXPECT_EQ_INT(JSON_ARRAY, j.get_type());
@@ -132,18 +125,45 @@ static void test_parse_array()
     EXPECT_EQ_INT(PARSE_OK, j.parse("[  null , false , true , 123 , \"abc\"  ]"));
     EXPECT_EQ_INT(JSON_ARRAY, j.get_type());
     EXPECT_EQ_SIZE_T(5, j.get_array_size());
-    EXPECT_EQ_INT(JSON_NULL, j.get_array_element(0).type);
-    EXPECT_EQ_INT(JSON_FALSE, j.get_array_element(1).type);
-    EXPECT_EQ_INT(JSON_TRUE, j.get_array_element(2).type);
-    EXPECT_EQ_INT(JSON_NUMBER, j.get_array_element(3).type);
-    EXPECT_EQ_INT(JSON_STRING, j.get_array_element(4).type);
-    EXPECT_EQ_DOUBLE(123.0, j.get_array_element(3).number);
-    EXPECT_EQ_STRING("abc", j.get_array_element(4).str);
+    EXPECT_EQ_INT(JSON_NULL, j.get_array_element(0).get_type());
+    EXPECT_EQ_INT(JSON_FALSE, j.get_array_element(1).get_type());
+    EXPECT_EQ_INT(JSON_TRUE, j.get_array_element(2).get_type());
+    EXPECT_EQ_INT(JSON_NUMBER, j.get_array_element(3).get_type());
+    EXPECT_EQ_INT(JSON_STRING, j.get_array_element(4).get_type());
+    EXPECT_EQ_DOUBLE(123.0, j.get_array_element(3).get_number());
+    EXPECT_EQ_STRING("abc", j.get_array_element(4).get_string());
 
     EXPECT_EQ_INT(PARSE_OK, j.parse("[ [  ] , [ 0  ] , [ 0 , 1  ] , [ 0 , 1 , 2  ]  ]"));
     EXPECT_EQ_INT(JSON_ARRAY, j.get_type());
     EXPECT_EQ_SIZE_T(4, j.get_array_size());
     EXPECT_EQ_INT(JSON_ARRAY, j.get_array_element(0).get_type());
+}
+
+void test_parse_object() {
+    json j("{  "
+           "\"n\" : null , "
+           "\"f\" : false , "
+           "\"t\" : true , "
+           "\"i\" : 123 , "
+           "\"s\" : \"abc\", "
+           "\"a\" : [ 1, 2, 3  ],"
+           "\"o\" : { \"1\" : 1, \"2\" : 2, \"3\" : 3  }"
+           " } "
+          );
+    EXPECT_EQ_INT(PARSE_OK, j.parse());
+    EXPECT_EQ_INT(JSON_OBJECT, j.get_type());
+    EXPECT_EQ_INT(JSON_NULL, j.get_object("n").get_type());
+    EXPECT_EQ_INT(JSON_FALSE, j.get_object("f").get_type());
+    EXPECT_EQ_INT(JSON_TRUE, j.get_object("t").get_type());
+    json_value v = j.get_object("i");
+    EXPECT_EQ_INT(JSON_NUMBER, v.get_type());
+    EXPECT_EQ_DOUBLE(123, v.get_number());
+    v = j.get_object("s");
+    EXPECT_EQ_INT(JSON_STRING, v.get_type());
+    EXPECT_EQ_STRING("abc", v.get_string());
+    v = j.get_object("a");
+    EXPECT_EQ_INT(JSON_ARRAY, v.get_type());
+    EXPECT_EQ_INT(JSON_OBJECT, j.get_object("o").get_type());
 }
 
 #define TEST_ERROR(error, json_source) \
@@ -153,14 +173,12 @@ static void test_parse_array()
         EXPECT_EQ_INT(JSON_NULL, j.get_type());\
     } while(0)
 
-static void test_parse_expect_value()
-{
+static void test_parse_expect_value() {
     TEST_ERROR(PARSE_EXPECT_VALUE, "");
     TEST_ERROR(PARSE_EXPECT_VALUE, " ");
 }
 
-static void test_parse_invalid_value()
-{
+static void test_parse_invalid_value() {
     TEST_ERROR(PARSE_INVALID_VALUE, "nul");
     TEST_ERROR(PARSE_INVALID_VALUE, "?");
 }
@@ -174,34 +192,29 @@ static void test_parse_root_not_singular() {
     TEST_ERROR(PARSE_ROOT_NOT_SINGULAR, "0x123");
 }
 
-static void test_parse_number_too_big()
-{
+static void test_parse_number_too_big() {
     TEST_ERROR(PARSE_NUMBER_OVERFLOW, "1e309");
     TEST_ERROR(PARSE_NUMBER_OVERFLOW, "-1e309");
 }
 
-static void test_parse_missing_quotation_mark()
-{
+static void test_parse_missing_quotation_mark() {
     TEST_ERROR(PARSE_MISS_QUOTATION_MARK, "\"");
     TEST_ERROR(PARSE_MISS_QUOTATION_MARK, "\"abc");
 }
 
-static void test_parse_invalid_string_escape()
-{
+static void test_parse_invalid_string_escape() {
     TEST_ERROR(PARSE_INVALID_STRING_ESCAPE, "\"\\v\"");
     TEST_ERROR(PARSE_INVALID_STRING_ESCAPE, "\"\\'\"");
     TEST_ERROR(PARSE_INVALID_STRING_ESCAPE, "\"\\0\"");
     TEST_ERROR(PARSE_INVALID_STRING_ESCAPE, "\"\\x12\"");
 }
 
-static void test_parse_invalid_string_char()
-{
+static void test_parse_invalid_string_char() {
     TEST_ERROR(PARSE_INVALID_STRING_CHAR, "\"\x01\"");
     TEST_ERROR(PARSE_INVALID_STRING_CHAR, "\"\x1F\"");
 }
 
-static void test_parse_invalid_unicode_hex()
-{
+static void test_parse_invalid_unicode_hex() {
     TEST_ERROR(PARSE_INVALID_UNICODE_HEX, "\"\\u\"");
     TEST_ERROR(PARSE_INVALID_UNICODE_HEX, "\"\\u0\"");
     TEST_ERROR(PARSE_INVALID_UNICODE_HEX, "\"\\u01\"");
@@ -217,8 +230,7 @@ static void test_parse_invalid_unicode_hex()
     TEST_ERROR(PARSE_INVALID_UNICODE_HEX, "\"\\u 123\"");
 }
 
-static void test_parse_invalid_unicode_surrogate()
-{
+static void test_parse_invalid_unicode_surrogate() {
     TEST_ERROR(PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\"");
     TEST_ERROR(PARSE_INVALID_UNICODE_SURROGATE, "\"\\uDBFF\"");
     TEST_ERROR(PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\\\\"");
@@ -226,14 +238,15 @@ static void test_parse_invalid_unicode_surrogate()
     TEST_ERROR(PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uE000\"");
 }
 
-static void test_parse()
-{
+static void test_parse() {
     test_parse_null();
     test_parse_true();
     test_parse_false();
     test_parse_number();
     test_parse_string();
     test_parse_array();
+    test_parse_object();
+
     test_parse_expect_value();
     test_parse_invalid_value();
     test_parse_root_not_singular();
@@ -245,8 +258,7 @@ static void test_parse()
     test_parse_invalid_unicode_surrogate();
 }
 
-int main()
-{
+int main() {
     test_parse();
     printf("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
     return main_ret;

@@ -26,7 +26,10 @@ enum error_number {
     PARSE_INVALID_STRING_ESCAPE,
     PARSE_INVALID_UNICODE_HEX,
     PARSE_INVALID_UNICODE_SURROGATE,
-    PARSE_MISS_COMMA_OR_SQUARE_BRAKET
+    PARSE_MISS_COMMA_OR_SQUARE_BRAKET,
+    PARSE_MISS_KEY,
+    PARSE_MISS_COLON,
+    PARSE_MISS_COMMA_OR_CURLY_BRACKET
 };
 
 enum json_type {
@@ -47,7 +50,51 @@ public:
     int get_type() {
         return type;
     }
-public:
+
+    double get_number() {
+        assert(type == JSON_NUMBER);
+        return number;
+    }
+
+    string get_string() {
+        assert(type == JSON_STRING);
+        return str;
+    }
+
+    vector<json_value> get_array() {
+        assert(type == JSON_ARRAY);
+        return array;
+    }
+
+    map<string, json_value> get_object() {
+        assert(type == JSON_OBJECT);
+        return object;
+    }
+
+    void set_literal(json_type dst_type) {
+        type = dst_type;
+    }
+
+    void set_number(double dst_number) {
+        type = JSON_NUMBER;
+        number = dst_number;
+    }
+
+    void set_string(string& dst_str) {
+        type = JSON_STRING;
+        str = dst_str;
+    }
+
+    void set_array(vector<json_value>& dst_array) {
+        type = JSON_ARRAY;
+        array = dst_array;
+    }
+
+    void set_object(map<string, json_value>& dst_object) {
+        type = JSON_OBJECT;
+        object = dst_object;
+    }
+private:
     json_type type = JSON_NULL;
     double number;
     string str;
@@ -70,7 +117,7 @@ public:
         if ((ret = parse_value()) == PARSE_OK) {
             skip_blank();
             if (it != json_source.end()) {
-                value->type = JSON_NULL;
+                value->set_literal(JSON_NULL);
                 return PARSE_ROOT_NOT_SINGULAR;
             }
         }
@@ -106,9 +153,9 @@ private:
         if (strncmp(&(*it), dst, len) == 0) {
             it += len;
             if (element != nullptr)
-                element->type = type;
+                element->set_literal(type);
             else
-                value->type = type;
+                value->set_literal(type);
             return PARSE_OK;
         }
         else
@@ -145,34 +192,40 @@ private:
         }
         // if (*tmp_it != ' ' && *tmp_it != '\0')
         //    return PARSE_INVALID_VALUE;
-        value->number = strtod(&(*it), NULL);
-        if (errno == ERANGE && (value->number == HUGE_VAL || value->number == -HUGE_VAL))
+        double dst_number = strtod(&(*it), NULL);
+        if (errno == ERANGE && (dst_number == HUGE_VAL || dst_number == -HUGE_VAL))
             return PARSE_NUMBER_OVERFLOW;
         it = tmp_it;
-        if (element != nullptr) {
-            element->number = value->number;
-            element->type = JSON_NUMBER;
-        }
+        if (element != nullptr)
+            element->set_number(dst_number);
         else
-            value->type = JSON_NUMBER;
+            value->set_number(dst_number);
         return PARSE_OK;
     }
 
 #define CHECK_ITERATOR(it) do { if (it == json_source.end()) return PARSE_MISS_QUOTATION_MARK; } while(0)
 
     int parse_string(json_value* element = nullptr) {
-        string::const_iterator tmp_it = it + 1;
         string tmp_str;
+        string::const_iterator tmp_it = it;
+        int ret = parse_string(tmp_str, tmp_it);
+        if (ret == PARSE_OK) {
+            it = tmp_it;
+            if (element != nullptr)
+                element->set_string(tmp_str);
+            else
+                value->set_string(tmp_str);
+        }
+        return ret;
+    }
+
+    int parse_string(string& tmp_str, string::const_iterator& tmp_it) {
         char ch = 0;
+        tmp_it++;
         while (tmp_it != json_source.end()) {
             ch = *tmp_it++;
             switch (ch) {
             case '\"':
-                set_string(tmp_str, element);
-                if (tmp_it == json_source.end())
-                    it = tmp_it;
-                else
-                    it = tmp_it + 1;
                 return PARSE_OK;
             case '\\':
                 if (tmp_it != json_source.end()) {
@@ -235,9 +288,9 @@ private:
         if (*it == ']') {
             it++;
             if (element != nullptr)
-                element->type = JSON_ARRAY;
+                element->set_array(tmp_array);
             else
-                value->type = JSON_ARRAY;
+                value->set_array(tmp_array);
             return PARSE_OK;
         }
         while (it != json_source.end()) {
@@ -260,43 +313,61 @@ private:
             else
                 return PARSE_MISS_COMMA_OR_SQUARE_BRAKET;
         }
-        if (element != nullptr) {
-            element->type = JSON_ARRAY;
-            element->array = tmp_array;
-        }
-        else {
-            value->type =JSON_ARRAY;
-            value->array = tmp_array;
-        }
+        if (element != nullptr)
+            element->set_array(tmp_array);
+        else
+            value->set_array(tmp_array);
         return PARSE_OK;
     }
 
     int parse_object(json_value* element = nullptr) {
         it++;
         skip_blank();
+        int ret = 0;
+        map<string, json_value> tmp_object;
         if (*it == '}') {
             if (element != nullptr)
-                element->type = JSON_OBJECT;
+                element->set_object(tmp_object);
             else
-                value->type = JSON_OBJECT;
+                value->set_object(tmp_object);
             return PARSE_OK;
         }
         for (;;) {
             skip_blank();
+            CHECK_ITERATOR(it);
+            if (*it != '\"')
+                return PARSE_MISS_KEY;
+            string key_str;
             string::const_iterator tmp_it = it;
-
-        }
-        return PARSE_OK;
-    }
-
-    void set_string(const string& str, json_value* element = nullptr) {
-        if (element != nullptr) {
-            element->type = JSON_STRING;
-            element->str =str;
-        }
-        else {
-            value->type = JSON_STRING;
-            value->str = str;
+            if ((ret = parse_string(key_str, tmp_it)) != PARSE_OK)
+                return PARSE_MISS_KEY;
+            it = tmp_it;
+            skip_blank();
+            CHECK_ITERATOR(it);
+            if (*it != ':')
+                return PARSE_MISS_COLON;
+            it++;
+            skip_blank();
+            CHECK_ITERATOR(it);
+            json_value tmp_value;
+            if ((ret = parse_value(&tmp_value)) != PARSE_OK)
+                return ret;
+            tmp_object.insert(make_pair(key_str, tmp_value));
+            skip_blank();
+            CHECK_ITERATOR(it);
+            if (*it == '}') {
+                it++;
+                if (element != nullptr)
+                    element->set_object(tmp_object);
+                else
+                    value->set_object(tmp_object);
+                return PARSE_OK;
+            }
+            else if (*it == ',')
+                it++;
+            else {
+                return PARSE_MISS_COMMA_OR_CURLY_BRACKET;
+            }
         }
     }
 
@@ -389,33 +460,36 @@ public:
         return ret;
     }
 
+    json_value& get_value() {
+        return value;
+    }
+
     int get_type() {
-        return value.type;
+        return value.get_type();
     }
 
     double get_number() {
-        assert(value.type == JSON_NUMBER);
-        return value.number;
+        return value.get_number();
     }
 
-    string& get_string() {
-        assert(value.type == JSON_STRING);
-        return value.str;
+    string get_string() {
+        return value.get_string();
     }
 
     void set_string(string str) {
-        value.type = JSON_STRING;
-        value.str = str;
+        value.set_string(str);
     }
 
-    json_value& get_array_element(size_t index) {
-        assert(value.type == JSON_ARRAY && index < value.array.size());
-        return value.array[index];
+    json_value get_array_element(size_t index) {
+        return value.get_array()[index];
     }
 
     size_t get_array_size() {
-        assert(value.type == JSON_ARRAY);
-        return value.array.size();
+        return value.get_array().size();
+    }
+
+    json_value& get_object(string key) {
+        return value.get_object()[key];
     }
 private:
     json_value value;
