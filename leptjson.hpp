@@ -145,8 +145,8 @@ static int lept_parse_number(lept_context* c, lept_value* v)
         return LEPT_PARSE_INVALID_VALUE;
     errno = 0;
     char* end = NULL;
-    v->num = strtod(c->json, &end);
-    if (errno == ERANGE && (v->num == HUGE_VAL || v->num == -HUGE_VAL))
+        v->num = strtod(c->json, &end);
+        if (errno == ERANGE && (v->num == HUGE_VAL || v->num == -HUGE_VAL))
         return LEPT_PARSE_NUMBER_OVERFLOW;
     v->type = LEPT_NUMBER;
     c->json = end;
