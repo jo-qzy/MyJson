@@ -12,4 +12,4 @@ $(bin1):test.cpp
 
 .PHONY:clean
 clean:
-	rm -rf test core*
+	rm -rf test test1 core*
