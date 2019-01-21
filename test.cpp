@@ -25,29 +25,33 @@ int test_pass = 0;
 #define EXPECT_EQ_SIZE_T(expect, actual) EXPECT_EQ_BASE((expect) == (actual), (size_t)expect, (size_t)actual)
 
 static void test_parse_null() {
-    json j;
-    EXPECT_EQ_INT(PARSE_OK, j.parse("null"));
-    EXPECT_EQ_INT(JSON_NULL, j.get_type());
+    Reader reader;
+    Value value;
+    EXPECT_EQ_INT(PARSE_OK, reader.parse("null", value));    
+    EXPECT_EQ_INT(JSON_NULL, value.get_type());
 }
 
 static void test_parse_true() {
-    json j;
-    EXPECT_EQ_INT(PARSE_OK, j.parse("true"));
-    EXPECT_EQ_INT(JSON_TRUE, j.get_type());
+    Reader reader;
+    Value value;
+    EXPECT_EQ_INT(PARSE_OK, reader.parse("true", value));
+    EXPECT_EQ_INT(JSON_TRUE, value.get_type());
 }
 
 static void test_parse_false() {
-    json j;
-    EXPECT_EQ_INT(PARSE_OK, j.parse("false"));
-    EXPECT_EQ_INT(JSON_FALSE, j.get_type());
+    Reader reader;
+    Value value;
+    EXPECT_EQ_INT(PARSE_OK, reader.parse("false", value));
+    EXPECT_EQ_INT(JSON_FALSE, value.get_type());
 }
 
 #define TEST_NUMBER(expect, json_source) \
     do{\
-        json j;\
-        EXPECT_EQ_INT(PARSE_OK, j.parse(json_source));\
-        EXPECT_EQ_INT(JSON_NUMBER, j.get_type());\
-        EXPECT_EQ_DOUBLE(expect, j.get_number());\
+        Reader reader;\
+        Value value;\
+        EXPECT_EQ_INT(PARSE_OK, reader.parse(json_source, value));\
+        EXPECT_EQ_INT(JSON_NUMBER, value.get_type());\
+        EXPECT_EQ_DOUBLE(expect, value.get_number());\
     } while (0)
 
 static void test_parse_number() {
@@ -86,11 +90,12 @@ static void test_parse_number() {
 
 #define TEST_STRING(expect, json_source) \
     do {\
-        json j;\
+        Reader reader;\
+        Value value;\
         string dst = expect;\
-        EXPECT_EQ_INT(PARSE_OK, j.parse(json_source));\
-        EXPECT_EQ_INT(JSON_STRING, j.get_type());\
-        EXPECT_EQ_STRING(dst, j.get_string());\
+        EXPECT_EQ_INT(PARSE_OK, reader.parse(json_source, value));\
+        EXPECT_EQ_INT(JSON_STRING, value.get_type());\
+        EXPECT_EQ_STRING(dst, value.get_string());\
     } while (0)
 
 static void test_parse_string() {
@@ -109,68 +114,72 @@ static void test_parse_string() {
 }
 
 static void test_access_string() {
-    json j;
-    j.set_string("");
-    EXPECT_EQ_STRING("", j.get_string());
-    j.set_string("Hello");
-    EXPECT_EQ_STRING("Hello", j.get_string());
+    Reader reader;
+    Value value;
+    value.set_string("");
+    EXPECT_EQ_STRING("", value.get_string());
+    value.set_string("Hello");
+    EXPECT_EQ_STRING("Hello", value.get_string());
 }
 
 static void test_parse_array() {
-    json j;
-    EXPECT_EQ_INT(PARSE_OK, j.parse("[   ]"));
-    EXPECT_EQ_INT(JSON_ARRAY, j.get_type());
-    EXPECT_EQ_SIZE_T(0, j.get_array_size());
+    Reader reader;
+    Value value;
+    EXPECT_EQ_INT(PARSE_OK, reader.parse("[   ]", value));
+    EXPECT_EQ_INT(JSON_ARRAY, value.get_type());
+    EXPECT_EQ_SIZE_T(0, value.get_array().size());
 
-    EXPECT_EQ_INT(PARSE_OK, j.parse("[  null , false , true , 123 , \"abc\"  ]"));
-    EXPECT_EQ_INT(JSON_ARRAY, j.get_type());
-    EXPECT_EQ_SIZE_T(5, j.get_array_size());
-    EXPECT_EQ_INT(JSON_NULL, j.get_array_element(0).get_type());
-    EXPECT_EQ_INT(JSON_FALSE, j.get_array_element(1).get_type());
-    EXPECT_EQ_INT(JSON_TRUE, j.get_array_element(2).get_type());
-    EXPECT_EQ_INT(JSON_NUMBER, j.get_array_element(3).get_type());
-    EXPECT_EQ_INT(JSON_STRING, j.get_array_element(4).get_type());
-    EXPECT_EQ_DOUBLE(123.0, j.get_array_element(3).get_number());
-    EXPECT_EQ_STRING("abc", j.get_array_element(4).get_string());
+    EXPECT_EQ_INT(PARSE_OK, reader.parse("[  null , false , true , 123 , \"abc\"  ]", value));
+    EXPECT_EQ_INT(JSON_ARRAY, value.get_type());
+    EXPECT_EQ_SIZE_T(5, value.get_array().size());
+    EXPECT_EQ_INT(JSON_NULL, value.get_array()[0].get_type());
+    EXPECT_EQ_INT(JSON_FALSE, value.get_array()[1].get_type());
+    EXPECT_EQ_INT(JSON_TRUE, value.get_array()[2].get_type());
+    EXPECT_EQ_INT(JSON_NUMBER, value.get_array()[3].get_type());
+    EXPECT_EQ_INT(JSON_STRING, value.get_array()[4].get_type());
+    EXPECT_EQ_DOUBLE(123.0, value.get_array()[3].get_number());
+    EXPECT_EQ_STRING("abc", value.get_array()[4].get_string());
 
-    EXPECT_EQ_INT(PARSE_OK, j.parse("[ [  ] , [ 0  ] , [ 0 , 1  ] , [ 0 , 1 , 2  ]  ]"));
-    EXPECT_EQ_INT(JSON_ARRAY, j.get_type());
-    EXPECT_EQ_SIZE_T(4, j.get_array_size());
-    EXPECT_EQ_INT(JSON_ARRAY, j.get_array_element(0).get_type());
+    EXPECT_EQ_INT(PARSE_OK, reader.parse("[ [  ] , [ 0  ] , [ 0 , 1  ] , [ 0 , 1 , 2  ]  ]", value));
+    EXPECT_EQ_INT(JSON_ARRAY, value.get_type());
+    EXPECT_EQ_SIZE_T(4, value.get_array().size());
+    EXPECT_EQ_INT(JSON_ARRAY, value.get_array()[0].get_type());
 }
 
 void test_parse_object() {
-    json j("{  "
-           "\"n\" : null , "
-           "\"f\" : false , "
-           "\"t\" : true , "
-           "\"i\" : 123 , "
-           "\"s\" : \"abc\", "
-           "\"a\" : [ 1, 2, 3  ],"
-           "\"o\" : { \"1\" : 1, \"2\" : 2, \"3\" : 3  }"
-           " } "
-          );
-    EXPECT_EQ_INT(PARSE_OK, j.parse());
-    EXPECT_EQ_INT(JSON_OBJECT, j.get_type());
-    EXPECT_EQ_INT(JSON_NULL, j.get_object("n").get_type());
-    EXPECT_EQ_INT(JSON_FALSE, j.get_object("f").get_type());
-    EXPECT_EQ_INT(JSON_TRUE, j.get_object("t").get_type());
-    json_value v = j.get_object("i");
+    Reader reader;
+    Value value;
+    EXPECT_EQ_INT(PARSE_OK, reader.parse("{"
+                                         "\"n\" : null , "
+                                         "\"f\" : false , "
+                                         "\"t\" : true , "
+                                         "\"i\" : 123 , "
+                                         "\"s\" : \"abc\", "
+                                         "\"a\" : [ 1, 2, 3  ],"
+                                         "\"o\" : { \"1\" : 1, \"2\" : 2, \"3\" : 3  }"
+                                         " } "
+                                         , value));
+    EXPECT_EQ_INT(JSON_OBJECT, value.get_type());
+    EXPECT_EQ_INT(JSON_NULL, value.get_object("n").get_type());
+    EXPECT_EQ_INT(JSON_FALSE, value.get_object("f").get_type());
+    EXPECT_EQ_INT(JSON_TRUE, value.get_object("t").get_type());
+    Value v = value.get_object("i");
     EXPECT_EQ_INT(JSON_NUMBER, v.get_type());
     EXPECT_EQ_DOUBLE(123, v.get_number());
-    v = j.get_object("s");
+    v = value.get_object("s");
     EXPECT_EQ_INT(JSON_STRING, v.get_type());
     EXPECT_EQ_STRING("abc", v.get_string());
-    v = j.get_object("a");
+    v = value.get_object("a");
     EXPECT_EQ_INT(JSON_ARRAY, v.get_type());
-    EXPECT_EQ_INT(JSON_OBJECT, j.get_object("o").get_type());
+    EXPECT_EQ_INT(JSON_OBJECT, value.get_object("o").get_type());
 }
 
 #define TEST_ERROR(error, json_source) \
     do{\
-        json j;\
-        EXPECT_EQ_INT(error, j.parse(json_source));\
-        EXPECT_EQ_INT(JSON_NULL, j.get_type());\
+        Reader reader;\
+        Value value;\
+        EXPECT_EQ_INT(error, reader.parse(json_source, value));\
+        EXPECT_EQ_INT(JSON_NULL, value.get_type());\
     } while(0)
 
 static void test_parse_expect_value() {
@@ -258,8 +267,29 @@ static void test_parse() {
     test_parse_invalid_unicode_surrogate();
 }
 
+static void test_convert() {
+    Reader reader;
+    Value value;
+    string json_source("{  "
+                        "\"n\" : null , "
+                        "\"f\" : false , "
+                        "\"t\" : true , "
+                        "\"i\" : 123 , "
+                        "\"s\" : \"abc\", "
+                        "\"a\" : [ 1, 2, 3  ],"
+                        "\"o\" : { \"1\" : 1, \"2\" : 2, \"3\" : 3  }"
+                      " } "
+                      );
+    EXPECT_EQ_INT(PARSE_OK, reader.parse(json_source, value));
+    EXPECT_EQ_INT(JSON_OBJECT, value.get_type());
+    StyleWriter sw;
+    string str = sw.toStyledString(value);
+    cout << str << endl;
+}
+
 int main() {
     test_parse();
     printf("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
+    test_convert();
     return main_ret;
 }

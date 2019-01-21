@@ -42,12 +42,12 @@ enum json_type {
     JSON_OBJECT
 };
 
-struct json_value {
+struct Value {
 public:
-    ~json_value() {
+    ~Value() {
     }
 
-    int get_type() {
+    json_type get_type() {
         return type;
     }
 
@@ -61,14 +61,19 @@ public:
         return str;
     }
 
-    vector<json_value> get_array() {
+    vector<Value> get_array() {
         assert(type == JSON_ARRAY);
         return array;
     }
 
-    map<string, json_value> get_object() {
+    map<string, Value> get_object() {
         assert(type == JSON_OBJECT);
         return object;
+    }
+
+    Value get_object(string str) {
+        assert(type == JSON_OBJECT);
+        return object[str];
     }
 
     void set_literal(json_type dst_type) {
@@ -80,31 +85,36 @@ public:
         number = dst_number;
     }
 
-    void set_string(string& dst_str) {
+    void set_string(string dst_str) {
         type = JSON_STRING;
         str = dst_str;
     }
 
-    void set_array(vector<json_value>& dst_array) {
+    void set_array(vector<Value>& dst_array) {
         type = JSON_ARRAY;
         array = dst_array;
     }
 
-    void set_object(map<string, json_value>& dst_object) {
+    void set_object(map<string, Value>& dst_object) {
         type = JSON_OBJECT;
         object = dst_object;
     }
+
+//  string toStyledString() {
+//      StyleWriter sw;
+//      sw->toStyledString(*this);
+//  }
 private:
     json_type type = JSON_NULL;
     double number;
     string str;
-    vector<json_value> array;
-    map<string, json_value> object;
+    vector<Value> array;
+    map<string, Value> object;
 };
 
-class json_value_parse {
+class value_parse {
 public:
-    void set_json_source(const string& source, json_value* v) {
+    void set_json_source(const string& source, Value* v) {
         json_source = source;
         it = json_source.begin();
         value = v;
@@ -124,7 +134,7 @@ public:
         return ret;
     }
 private:
-    int parse_value(json_value* element = nullptr) {
+    int parse_value(Value* element = nullptr) {
         if (it == json_source.end())
             return PARSE_EXPECT_VALUE;
         switch (*it) {
@@ -148,7 +158,7 @@ private:
             it++;
     }
 
-    int parse_literal(const char* dst, json_type type, json_value* element = nullptr) {
+    int parse_literal(const char* dst, json_type type, Value* element = nullptr) {
         int len = strlen(dst);
         if (strncmp(&(*it), dst, len) == 0) {
             it += len;
@@ -165,7 +175,7 @@ private:
 #define ISDIGIT(num) ((num >= '0') && (num <= '9'))
 #define ISDIGIT1TO9(num) ((num >= '1') && (num <= '9'))
 
-    int parse_number(json_value* element = nullptr) {
+    int parse_number(Value* element = nullptr) {
         string::const_iterator tmp_it = it;
         if (*tmp_it == '-')
             tmp_it++;
@@ -205,7 +215,7 @@ private:
 
 #define CHECK_ITERATOR(it) do { if (it == json_source.end()) return PARSE_MISS_QUOTATION_MARK; } while(0)
 
-    int parse_string(json_value* element = nullptr) {
+    int parse_string(Value* element = nullptr) {
         string tmp_str;
         string::const_iterator tmp_it = it;
         int ret = parse_string(tmp_str, tmp_it);
@@ -280,9 +290,9 @@ private:
         return PARSE_MISS_QUOTATION_MARK;
     }
 
-    int parse_array(json_value* element = nullptr) {
+    int parse_array(Value* element = nullptr) {
         it++;
-        vector<json_value> tmp_array;
+        vector<Value> tmp_array;
         int ret = 0;
         skip_blank();
         if (*it == ']') {
@@ -294,7 +304,7 @@ private:
             return PARSE_OK;
         }
         while (it != json_source.end()) {
-            json_value tmp_element;
+            Value tmp_element;
             skip_blank();
             if ((ret = parse_value(&tmp_element)) != PARSE_OK)
                 return ret;
@@ -320,11 +330,11 @@ private:
         return PARSE_OK;
     }
 
-    int parse_object(json_value* element = nullptr) {
+    int parse_object(Value* element = nullptr) {
         it++;
         skip_blank();
         int ret = 0;
-        map<string, json_value> tmp_object;
+        map<string, Value> tmp_object;
         if (*it == '}') {
             if (element != nullptr)
                 element->set_object(tmp_object);
@@ -349,7 +359,7 @@ private:
             it++;
             skip_blank();
             CHECK_ITERATOR(it);
-            json_value tmp_value;
+            Value tmp_value;
             if ((ret = parse_value(&tmp_value)) != PARSE_OK)
                 return ret;
             tmp_object.insert(make_pair(key_str, tmp_value));
@@ -411,14 +421,14 @@ private:
 private:
     string json_source;
     string::const_iterator it;
-    json_value* value;
+    Value* value;
 };
 
-class json_parser : public json_value_parse {
+class json_parser : public value_parse {
 private:
     json_parser() {}
 public:
-    static json_parser* get_parser(const string& source, json_value* v){
+    static json_parser* get_parser(const string& source, Value* v){
         static json_parser singleton_parser;
         singleton_parser.set_json_source(source, v);
         // use singleton create parser
@@ -430,16 +440,18 @@ public:
     json_parser& operator=(const json_parser& ban_parser) = delete;
 };
 
-class json {
+class Reader {
 public:
-    json() {}
+    Reader() {}
 
-    json(const char* str) {
+    Reader(const char* str, Value& value) {
         json_source += str;
+        json_value = &value;
     }
 
-    json(const string& str) {
+    Reader(const string str, Value& value) {
         json_source = str;
+        json_value = &value;
     }
 
     int parse() {
@@ -447,54 +459,116 @@ public:
             cout << "please input json text to parse" << endl;
             return PARSE_INVALID_VALUE;
         }
-        parser = json_parser::get_parser(json_source, &value);
+        parser = json_parser::get_parser(json_source, json_value);
         int ret = parser->parse();
         parser = nullptr;
         return ret;
     }
 
-    int parse(const string& str) {
+    int parse(const string str, Value& value) {
         parser = json_parser::get_parser(str, &value);
         int ret = parser->parse();
         parser = nullptr;
         return ret;
     }
+private:
+    string json_source;
+    Value* json_value;
+    json_parser* parser = nullptr;
+};
 
-    json_value& get_value() {
-        return value;
-    }
-
-    int get_type() {
-        return value.get_type();
-    }
-
-    double get_number() {
-        return value.get_number();
-    }
-
-    string get_string() {
-        return value.get_string();
-    }
-
-    void set_string(string str) {
-        value.set_string(str);
-    }
-
-    json_value get_array_element(size_t index) {
-        return value.get_array()[index];
-    }
-
-    size_t get_array_size() {
-        return value.get_array().size();
-    }
-
-    json_value& get_object(string key) {
-        return value.get_object()[key];
+class Writer {
+protected:
+    string convert_value(Value value) {
+        switch (value.get_type()) {
+        case JSON_NULL: return convert_literal(value.get_type()); break;
+        case JSON_TRUE: return convert_literal(value.get_type()); break;
+        case JSON_FALSE: return convert_literal(value.get_type()); break;
+        case JSON_NUMBER: return convert_number(value.get_number()); break;
+        case JSON_STRING: return convert_string(value.get_string()); break;
+        case JSON_ARRAY: return convert_array(value.get_array()); break;
+        case JSON_OBJECT: return convert_object(value.get_object()); break;
+        }
     }
 private:
-    json_value value;
-    string json_source;
-    json_parser* parser = nullptr;
+    string convert_literal(json_type type) {
+        switch (type) {
+        case JSON_NULL: return string("null");
+        case JSON_TRUE: return string("true");
+        case JSON_FALSE: return string("false");
+        }
+    }
+
+    string convert_number(const double number) {
+        char buf[50];
+        sprintf(buf, "%.17g", number);
+        return string(buf);
+    }
+
+    string convert_string(const string str) {
+        string tmp_str = "\"";
+        for (auto e : str) {
+            switch (e) {
+            case '\\': tmp_str += "\\\\"; break;
+            case '\"': tmp_str += "\\\""; break;
+            case '\b': tmp_str += "\\b"; break;
+            case '\f': tmp_str += "\\f"; break;
+            case '\n': tmp_str += "\\n"; break;
+            case '\r': tmp_str += "\\r"; break;
+            case '\t': tmp_str += "\\t"; break;
+            default:
+                if (e < 0x20) {
+                    char buf[7];
+                    sprintf(buf, "\\u%04x", e);
+                    tmp_str += buf;
+                }
+                else
+                    tmp_str += e;
+                break;
+            }
+        }
+        return tmp_str;
+    }
+
+    string convert_array(vector<Value> array) {
+        string tmp_str("[");
+        vector<Value>::const_iterator vt = array.begin();
+        for (vt; vt != array.end(); vt++) {
+            tmp_str += convert_value(*vt);
+            tmp_str +=",\n";
+        }
+        tmp_str.pop_back();
+        tmp_str.pop_back();
+        tmp_str += "\n]";
+        return tmp_str;
+    }
+
+    string convert_object(const map<string, Value> object) {
+        string tmp_str("{");
+        map<string, Value>::const_iterator mt = object.begin();
+        for (mt; mt != object.end(); mt++) {
+            tmp_str += mt->first;
+            tmp_str += " : ";
+            tmp_str += convert_value(mt->second);
+            tmp_str += ",\n";
+        }
+        tmp_str.pop_back();
+        tmp_str.pop_back();
+        tmp_str += "\n}";
+        return tmp_str;
+    }
+private:
+};
+
+class StyleWriter : public Writer {
+public:
+    string toStyledString(Value& value) {
+        return convert_value(value);
+    }
+};
+
+class FastWriter : public Writer {
+public:
 };
 
 #endif
