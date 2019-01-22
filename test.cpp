@@ -51,7 +51,7 @@ static void test_parse_false() {
         Value value;\
         EXPECT_EQ_INT(PARSE_OK, reader.parse(json_source, value));\
         EXPECT_EQ_INT(JSON_NUMBER, value.get_type());\
-        EXPECT_EQ_DOUBLE(expect, value.get_number());\
+        EXPECT_EQ_DOUBLE(expect, value.asDouble());\
     } while (0)
 
 static void test_parse_number() {
@@ -95,7 +95,7 @@ static void test_parse_number() {
         string dst = expect;\
         EXPECT_EQ_INT(PARSE_OK, reader.parse(json_source, value));\
         EXPECT_EQ_INT(JSON_STRING, value.get_type());\
-        EXPECT_EQ_STRING(dst, value.get_string());\
+        EXPECT_EQ_STRING(dst, value.asString());\
     } while (0)
 
 static void test_parse_string() {
@@ -117,9 +117,9 @@ static void test_access_string() {
     Reader reader;
     Value value;
     value.set_string("");
-    EXPECT_EQ_STRING("", value.get_string());
+    EXPECT_EQ_STRING("", value.asString());
     value.set_string("Hello");
-    EXPECT_EQ_STRING("Hello", value.get_string());
+    EXPECT_EQ_STRING("Hello", value.asString());
 }
 
 static void test_parse_array() {
@@ -132,18 +132,18 @@ static void test_parse_array() {
     EXPECT_EQ_INT(PARSE_OK, reader.parse("[  null , false , true , 123 , \"abc\"  ]", value));
     EXPECT_EQ_INT(JSON_ARRAY, value.get_type());
     EXPECT_EQ_SIZE_T(5, value.get_array().size());
-    EXPECT_EQ_INT(JSON_NULL, value.get_array()[0].get_type());
-    EXPECT_EQ_INT(JSON_FALSE, value.get_array()[1].get_type());
-    EXPECT_EQ_INT(JSON_TRUE, value.get_array()[2].get_type());
-    EXPECT_EQ_INT(JSON_NUMBER, value.get_array()[3].get_type());
-    EXPECT_EQ_INT(JSON_STRING, value.get_array()[4].get_type());
-    EXPECT_EQ_DOUBLE(123.0, value.get_array()[3].get_number());
-    EXPECT_EQ_STRING("abc", value.get_array()[4].get_string());
+    EXPECT_EQ_INT(JSON_NULL, value[0].get_type());
+    EXPECT_EQ_INT(JSON_FALSE, value[1].get_type());
+    EXPECT_EQ_INT(JSON_TRUE, value[2].get_type());
+    EXPECT_EQ_INT(JSON_NUMBER, value[3].get_type());
+    EXPECT_EQ_INT(JSON_STRING, value[4].get_type());
+    EXPECT_EQ_DOUBLE(123.0, value[3].asDouble());
+    EXPECT_EQ_STRING("abc", value[4].asString());
 
     EXPECT_EQ_INT(PARSE_OK, reader.parse("[ [  ] , [ 0  ] , [ 0 , 1  ] , [ 0 , 1 , 2  ]  ]", value));
     EXPECT_EQ_INT(JSON_ARRAY, value.get_type());
-    EXPECT_EQ_SIZE_T(4, value.get_array().size());
-    EXPECT_EQ_INT(JSON_ARRAY, value.get_array()[0].get_type());
+    EXPECT_EQ_SIZE_T(4, value.size());
+    EXPECT_EQ_INT(JSON_ARRAY, value[0].get_type());
 }
 
 void test_parse_object() {
@@ -160,18 +160,18 @@ void test_parse_object() {
                                          " } "
                                          , value));
     EXPECT_EQ_INT(JSON_OBJECT, value.get_type());
-    EXPECT_EQ_INT(JSON_NULL, value.get_object("n").get_type());
-    EXPECT_EQ_INT(JSON_FALSE, value.get_object("f").get_type());
-    EXPECT_EQ_INT(JSON_TRUE, value.get_object("t").get_type());
-    Value v = value.get_object("i");
-    EXPECT_EQ_INT(JSON_NUMBER, v.get_type());
-    EXPECT_EQ_DOUBLE(123, v.get_number());
-    v = value.get_object("s");
-    EXPECT_EQ_INT(JSON_STRING, v.get_type());
-    EXPECT_EQ_STRING("abc", v.get_string());
-    v = value.get_object("a");
-    EXPECT_EQ_INT(JSON_ARRAY, v.get_type());
-    EXPECT_EQ_INT(JSON_OBJECT, value.get_object("o").get_type());
+    EXPECT_EQ_INT(JSON_NULL, value["n"].get_type());
+    EXPECT_EQ_INT(JSON_FALSE, value["f"].get_type());
+    EXPECT_EQ_INT(JSON_TRUE, value["t"].get_type());
+
+    EXPECT_EQ_INT(JSON_NUMBER, value["i"].get_type());
+    EXPECT_EQ_DOUBLE(123, value["i"].asDouble());
+
+    EXPECT_EQ_INT(JSON_STRING, value["s"].get_type());
+    EXPECT_EQ_STRING("abc", value["s"].asString());
+
+    EXPECT_EQ_INT(JSON_ARRAY, value["a"].get_type());
+    EXPECT_EQ_INT(JSON_OBJECT, value["o"].get_type());
 }
 
 #define TEST_ERROR(error, json_source) \
@@ -282,8 +282,8 @@ static void test_convert() {
                       );
     EXPECT_EQ_INT(PARSE_OK, reader.parse(json_source, value));
     EXPECT_EQ_INT(JSON_OBJECT, value.get_type());
-    StyleWriter sw;
-    string str = sw.toStyledString(value);
+    FastWriter fw;
+    string str = fw.toStyledString(value);
     cout << str << endl;
 }
 

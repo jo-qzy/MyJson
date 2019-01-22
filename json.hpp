@@ -42,23 +42,144 @@ enum json_type {
     JSON_OBJECT
 };
 
-struct Value {
+class Writer;
+
+class Value {
 public:
+    Value() :type(JSON_NULL) {}
+
+    Value(double value) :type(JSON_NUMBER), number(value) {}
+
+    Value(const char* value) :type(JSON_STRING), str(value) {}
+
+    Value(const string& value) :type(JSON_STRING), str(value) {}
+
+    Value(const string key, const Value value) :type(JSON_OBJECT) {
+        object.insert(make_pair(key, value));
+    }
+
+    Value(const char *beginValue, const char *endValue) :type(JSON_STRING), str(beginValue, endValue) {}
+
     ~Value() {
+    }
+
+    Value& operator[](const string key) {
+        assert(type == JSON_OBJECT);
+        return object[key];
+    }
+
+//  const Value operator[](const string key) const {
+//      return object[key];
+//  }
+
+    Value& operator[](const size_t index) {
+        assert(type == JSON_ARRAY && index < array.size());
+        return array[index];
+    }
+
+    const Value& operator[](const size_t index) const {
+        assert(type == JSON_ARRAY && index < array.size());
+        return array[index];
     }
 
     json_type get_type() {
         return type;
     }
 
-    double get_number() {
+    double asDouble() const {
         assert(type == JSON_NUMBER);
         return number;
     }
 
-    string get_string() {
-        assert(type == JSON_STRING);
-        return str;
+    string asString() const {
+        switch (type) {
+        case JSON_NULL: return string("null");
+        case JSON_TRUE: return string("true");
+        case JSON_FALSE: return string("false");
+        case JSON_STRING: return str;
+//      case JSON_ARRAY: return string();
+//      case JSON_OBJECT: return string();
+        }
+    }
+
+    bool empty() {
+        switch (type) {
+        case JSON_ARRAY: return array.empty();
+        case JSON_OBJECT: return object.empty();
+        default: return true;
+        }
+    }
+
+    size_t size() {
+        assert(type == JSON_ARRAY || type == JSON_OBJECT);
+        switch (type) {
+        case JSON_ARRAY: return array.size();
+        case JSON_OBJECT: return object.size();
+        }
+    }
+
+    bool isNull() {
+        return type == JSON_NULL;
+    }
+
+    bool isBool() const {
+        return type == JSON_TRUE || type == JSON_FALSE;
+    }
+
+    bool isDouble() const {
+        return type == JSON_NUMBER;
+    }
+
+    bool isString() const {
+        return type == JSON_STRING;
+    }
+
+    bool isArray() const {
+        return type == JSON_ARRAY;
+    }
+
+    bool isObject() const {
+        return type == JSON_OBJECT;
+    }
+
+    bool isValidIndex(const size_t index) const {
+        return index < array.size();
+    }
+
+    bool isMember(string key) const {
+        return object.find(key) != object.end();
+    }
+
+    Value get(const string key, const Value default_value) const {
+        return Value(key, default_value);
+    }
+
+    vector<string> getMemberNames() const {
+        assert(type == JSON_OBJECT);
+        vector<string> names;
+        for (auto e : object) {
+            names.push_back(e.first);
+        }
+        return names;
+    }
+
+    Value removeMember(const string key) {
+        map<string, Value>::iterator mt = object.find(key);
+        if (mt != object.end())
+            object.erase(mt);
+        return *this;
+    }
+
+    void setComment(const string _comment) {
+        comment = _comment;
+    }
+
+    bool hasComment() {
+        return comment != "";
+    }
+
+    string getComment() {
+        return comment;
     }
 
     vector<Value> get_array() {
@@ -101,15 +222,16 @@ public:
     }
 
 //  string toStyledString() {
-//      StyleWriter sw;
-//      sw->toStyledString(*this);
+//      w->toStyledString(*this);
 //  }
 private:
-    json_type type = JSON_NULL;
+    json_type type;
+    string comment;
     double number;
     string str;
     vector<Value> array;
     map<string, Value> object;
+    Writer* w;
 };
 
 class value_parse {
@@ -442,60 +564,42 @@ public:
 
 class Reader {
 public:
-    Reader() {}
-
-    Reader(const char* str, Value& value) {
-        json_source += str;
-        json_value = &value;
-    }
-
-    Reader(const string str, Value& value) {
-        json_source = str;
-        json_value = &value;
-    }
-
-    int parse() {
-        if (json_source == "") {
-            cout << "please input json text to parse" << endl;
-            return PARSE_INVALID_VALUE;
-        }
-        parser = json_parser::get_parser(json_source, json_value);
+    static int parse(const string document, Value& value) {
+        json_parser* parser = json_parser::get_parser(document, &value);
         int ret = parser->parse();
         parser = nullptr;
         return ret;
     }
-
-    int parse(const string str, Value& value) {
-        parser = json_parser::get_parser(str, &value);
-        int ret = parser->parse();
-        parser = nullptr;
-        return ret;
-    }
-private:
-    string json_source;
-    Value* json_value;
-    json_parser* parser = nullptr;
 };
 
 class Writer {
+public:
+    string toStyledString(const Value& value);
+};
+
+class FastWriter : public Writer {
+public:
+    string toStyledString(Value& value) {
+        return convert_value(value);
+    }
 protected:
     string convert_value(Value value) {
         switch (value.get_type()) {
-        case JSON_NULL: return convert_literal(value.get_type()); break;
-        case JSON_TRUE: return convert_literal(value.get_type()); break;
-        case JSON_FALSE: return convert_literal(value.get_type()); break;
-        case JSON_NUMBER: return convert_number(value.get_number()); break;
-        case JSON_STRING: return convert_string(value.get_string()); break;
-        case JSON_ARRAY: return convert_array(value.get_array()); break;
-        case JSON_OBJECT: return convert_object(value.get_object()); break;
+            case JSON_NULL: return convert_literal(value.get_type()); break;
+            case JSON_TRUE: return convert_literal(value.get_type()); break;
+            case JSON_FALSE: return convert_literal(value.get_type()); break;
+            case JSON_NUMBER: return convert_number(value.asDouble()); break;
+            case JSON_STRING: return convert_string(value.asString()); break;
+            case JSON_ARRAY: return convert_array(value.get_array()); break;
+            case JSON_OBJECT: return convert_object(value.get_object()); break;
         }
     }
 private:
     string convert_literal(json_type type) {
         switch (type) {
-        case JSON_NULL: return string("null");
-        case JSON_TRUE: return string("true");
-        case JSON_FALSE: return string("false");
+            case JSON_NULL: return string("null");
+            case JSON_TRUE: return string("true");
+            case JSON_FALSE: return string("false");
         }
     }
 
@@ -509,21 +613,21 @@ private:
         string tmp_str = "\"";
         for (auto e : str) {
             switch (e) {
-            case '\\': tmp_str += "\\\\"; break;
-            case '\"': tmp_str += "\\\""; break;
-            case '\b': tmp_str += "\\b"; break;
-            case '\f': tmp_str += "\\f"; break;
-            case '\n': tmp_str += "\\n"; break;
-            case '\r': tmp_str += "\\r"; break;
-            case '\t': tmp_str += "\\t"; break;
-            default:
+                case '\\': tmp_str += "\\\\"; break;
+                case '\"': tmp_str += "\\\""; break;
+                case '\b': tmp_str += "\\b"; break;
+                case '\f': tmp_str += "\\f"; break;
+                case '\n': tmp_str += "\\n"; break;
+                case '\r': tmp_str += "\\r"; break;
+                case '\t': tmp_str += "\\t"; break;
+                default:
                 if (e < 0x20) {
                     char buf[7];
                     sprintf(buf, "\\u%04x", e);
                     tmp_str += buf;
                 }
                 else
-                    tmp_str += e;
+                tmp_str += e;
                 break;
             }
         }
@@ -531,44 +635,36 @@ private:
     }
 
     string convert_array(vector<Value> array) {
-        string tmp_str("[");
+        string tmp_str("[ ");
         vector<Value>::const_iterator vt = array.begin();
         for (vt; vt != array.end(); vt++) {
             tmp_str += convert_value(*vt);
-            tmp_str +=",\n";
+            tmp_str +=" , ";
         }
         tmp_str.pop_back();
         tmp_str.pop_back();
-        tmp_str += "\n]";
+        tmp_str += "]";
         return tmp_str;
     }
 
     string convert_object(const map<string, Value> object) {
-        string tmp_str("{");
-        map<string, Value>::const_iterator mt = object.begin();
-        for (mt; mt != object.end(); mt++) {
-            tmp_str += mt->first;
+        string tmp_str("{ ");
+        for (auto mt : object) {
+            tmp_str += mt.first;
             tmp_str += " : ";
-            tmp_str += convert_value(mt->second);
-            tmp_str += ",\n";
+            tmp_str += convert_value(mt.second);
+            tmp_str += " , ";
         }
         tmp_str.pop_back();
         tmp_str.pop_back();
-        tmp_str += "\n}";
+        tmp_str += "}";
         return tmp_str;
     }
-private:
 };
 
 class StyleWriter : public Writer {
 public:
-    string toStyledString(Value& value) {
-        return convert_value(value);
-    }
-};
 
-class FastWriter : public Writer {
-public:
 };
 
 #endif
