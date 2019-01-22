@@ -1,15 +1,14 @@
-bin=test
-bin1=test1
+bin=json_test
 cc=g++
 
-all:$(bin1)
+all:$(bin) example
 
-.PHONY:$(bin) $(bin1)
-$(bin):TestUnit.cpp
+.PHONY:$(bin) example
+$(bin):test.cpp
 	$(cc) -g -std=c++11 -o $@ $^
-$(bin1):test.cpp
+example:example.cpp
 	$(cc) -g -std=c++11 -o $@ $^
 
 .PHONY:clean
 clean:
-	rm -rf test test1 core*
+	rm -rf $(bin) example core*

@@ -5,6 +5,7 @@
 #include "json.hpp"
 
 using namespace std;
+using namespace JSON;
 
 int main_ret = 0;
 int test_count = 0;
@@ -116,9 +117,9 @@ static void test_parse_string() {
 static void test_access_string() {
     Reader reader;
     Value value;
-    value.set_string("");
+    value = "";
     EXPECT_EQ_STRING("", value.asString());
-    value.set_string("Hello");
+    value = "Hello";
     EXPECT_EQ_STRING("Hello", value.asString());
 }
 
@@ -127,11 +128,11 @@ static void test_parse_array() {
     Value value;
     EXPECT_EQ_INT(PARSE_OK, reader.parse("[   ]", value));
     EXPECT_EQ_INT(JSON_ARRAY, value.get_type());
-    EXPECT_EQ_SIZE_T(0, value.get_array().size());
+    EXPECT_EQ_SIZE_T(0, value.size());
 
     EXPECT_EQ_INT(PARSE_OK, reader.parse("[  null , false , true , 123 , \"abc\"  ]", value));
     EXPECT_EQ_INT(JSON_ARRAY, value.get_type());
-    EXPECT_EQ_SIZE_T(5, value.get_array().size());
+    EXPECT_EQ_SIZE_T(5, value.size());
     EXPECT_EQ_INT(JSON_NULL, value[0].get_type());
     EXPECT_EQ_INT(JSON_FALSE, value[1].get_type());
     EXPECT_EQ_INT(JSON_TRUE, value[2].get_type());
@@ -282,8 +283,13 @@ static void test_convert() {
                       );
     EXPECT_EQ_INT(PARSE_OK, reader.parse(json_source, value));
     EXPECT_EQ_INT(JSON_OBJECT, value.get_type());
+    
     FastWriter fw;
-    string str = fw.toStyledString(value);
+    string str = fw.write(value);
+    cout << str << endl;
+
+    StyleWriter sw;
+    str = sw.write(value);
     cout << str << endl;
 }
 
