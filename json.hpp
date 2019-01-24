@@ -41,7 +41,9 @@ namespace JSON {
         JSON_OBJECT
     };
 
-    class Writer;
+    class FastWriter;
+
+    class StyleWriter;
 
     class Value {
     public:
@@ -92,17 +94,6 @@ namespace JSON {
         double asDouble() const {
             assert(type == JSON_NUMBER);
             return number;
-        }
-
-        std::string asString() const {
-            switch (type) {
-            case JSON_NULL: return std::string("null");
-            case JSON_TRUE: return std::string("true");
-            case JSON_FALSE: return std::string("false");
-            case JSON_STRING: return str;
-    //      case JSON_ARRAY: return std::string();
-    //      case JSON_OBJECT: return std::string();
-            }
         }
 
         bool empty() {
@@ -281,9 +272,9 @@ namespace JSON {
             }
         }
 
-    //  std::string toStyledString() {
-    //      w->toStyledString(*this);
-    //  }
+        std::string toStyledString() const;
+
+        std::string asString() const;
     private:
         json_type type;
         std::string comment;
@@ -291,7 +282,8 @@ namespace JSON {
         std::string str;
         std::vector<Value> array;
         std::map<std::string, Value> object;
-        Writer* w;
+        FastWriter* fw;
+        StyleWriter* sw;
     };
 
     class value_parse {
@@ -364,8 +356,8 @@ namespace JSON {
                 return PARSE_INVALID_VALUE;
         }
 
-    #define ISDIGIT(num) ((num >= '0') && (num <= '9'))
-    #define ISDIGIT1TO9(num) ((num >= '1') && (num <= '9'))
+#define ISDIGIT(num) ((num >= '0') && (num <= '9'))
+#define ISDIGIT1TO9(num) ((num >= '1') && (num <= '9'))
 
         int parse_number(Value* element = nullptr) {
             std::string::const_iterator tmp_it = it;
@@ -405,7 +397,7 @@ namespace JSON {
             return PARSE_OK;
         }
 
-    #define CHECK_ITERATOR(it) do { if (it == json_source.end()) return PARSE_MISS_QUOTATION_MARK; } while(0)
+#define CHECK_ITERATOR(it) do { if (it == json_source.end()) return PARSE_MISS_QUOTATION_MARK; } while(0)
 
         int parse_string(Value* element = nullptr) {
             std::string tmp_str;
@@ -744,7 +736,7 @@ namespace JSON {
             return convert_value(root);
         }
     private:
-    #define PUSH_TAB(str)\
+#define PUSH_TAB(str)\
         do {\
             for (size_t tab_num = 0; tab_num < tab_count; tab_num++)\
                 str += "    ";\
@@ -793,6 +785,21 @@ namespace JSON {
     private:
         size_t tab_count = 0;
     };
+
+    std::string Value::asString() const {
+        switch (type) {
+        case JSON_NULL: return std::string("null");
+        case JSON_TRUE: return std::string("true");
+        case JSON_FALSE: return std::string("false");
+        case JSON_STRING: return str;
+        case JSON_ARRAY: return fw->write(*this);
+        case JSON_OBJECT: return fw->write(*this);
+        }
+    }
+
+    std::string Value::toStyledString() const {
+        sw->write(*this);
+    }
 
 };
 
